@@ -2,156 +2,166 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>3D 粒子探针交互系统</title>
+    <!-- 关键：禁止缩放，适配移动端视口 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>3D 粒子交互系统</title>
     <style>
-        /* --- 基础样式 --- */
-        body { margin: 0; overflow: hidden; background-color: #000000; font-family: -apple-system, BlinkMacSystemFont, "Microsoft YaHei", sans-serif; }
-        canvas { display: block; }
+        /* --- 沉浸式基础样式 --- */
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { 
+            margin: 0; 
+            padding: 0;
+            overflow: hidden; 
+            background-color: #000; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft YaHei", sans-serif;
+            width: 100vw;
+            height: 100dvh; /* 适配移动端动态高度 */
+        }
+        canvas { display: block; width: 100%; height: 100%; }
 
         /* --- UI 容器 --- */
-        #ui-container {
+        #ui-layer {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none; /* 让鼠标事件穿透到 Canvas */
+            pointer-events: none;
             z-index: 10;
-        }
-
-        /* --- 摄像头预览 (左上) --- */
-        #cam-preview {
-            position: absolute;
-            top: 15px; left: 15px;
-            width: 120px; height: 90px;
-            border-radius: 8px;
-            border: 1px solid rgba(0, 255, 255, 0.3);
-            background: #000;
-            overflow: hidden;
-            transform: scaleX(-1); /* 镜像翻转 */
-            box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);
-            pointer-events: auto;
-        }
-        #input_video { width: 100%; height: 100%; object-fit: cover; opacity: 0.8; }
-
-        /* --- 底部控制栏 --- */
-        #controls {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            gap: 15px;
-            align-items: center;
-            background: rgba(20, 20, 20, 0.8);
-            padding: 10px 20px;
-            border-radius: 30px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            pointer-events: auto;
-        }
-
-        /* 按钮与输入框样式 */
-        button, input[type="color"] {
-            background: none;
-            border: none;
-            cursor: pointer;
-            color: #fff;
-            font-size: 14px;
-            outline: none;
-        }
-        .btn {
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            padding: 5px 15px;
-            border-radius: 15px;
-            transition: 0.3s;
-        }
-        .btn:active { background: rgba(255,255,255,0.2); }
-        
-        /* 颜色选择器美化 */
-        #color-picker-wrapper {
-            display: flex; align-items: center; gap: 5px;
-            font-size: 12px; color: #aaa;
-        }
-        input[type="color"] {
-            width: 30px; height: 30px;
-            border-radius: 50%;
-            overflow: hidden;
-            border: 2px solid #fff;
-            padding: 0;
-        }
-        input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
-        input[type="color"]::-webkit-color-swatch { border: none; }
-
-        /* --- 状态提示文字 --- */
-        #status-text {
-            position: absolute;
-            top: 20px; right: 20px;
-            text-align: right;
-            color: rgba(0, 255, 255, 0.8);
-            font-size: 14px;
-            text-shadow: 0 0 5px rgba(0, 255, 255, 0.5);
-        }
-        #gesture-icon { font-size: 32px; display: block; margin-bottom: 5px; }
-
-        /* --- 加载遮罩 --- */
-        #loader {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: #000;
             display: flex;
             flex-direction: column;
+            justify-content: space-between;
+        }
+
+        /* --- 顶部信息栏 --- */
+        .top-bar {
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        /* 摄像头预览 (左上) */
+        #cam-box {
+            width: 100px; height: 75px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: #000;
+            overflow: hidden;
+            transform: scaleX(-1);
+            pointer-events: auto;
+            transition: opacity 0.3s;
+        }
+        /* 点击摄像头可隐藏/显示 */
+        #cam-box.hidden { opacity: 0.1; }
+        #input_video { width: 100%; height: 100%; object-fit: cover; }
+
+        /* 状态文字 (右上) */
+        .status-box {
+            text-align: right;
+            text-shadow: 0 0 5px rgba(0,0,0,0.8);
+        }
+        #gesture-icon { font-size: 2rem; display: block; margin-bottom: 5px; }
+        #mode-text { 
+            color: #00ffff; font-size: 0.9rem; font-weight: bold; 
+            background: rgba(0,0,0,0.4); padding: 4px 8px; border-radius: 4px;
+        }
+
+        /* --- 底部控制栏 --- */
+        .bottom-bar {
+            padding: 20px;
+            padding-bottom: max(20px, env(safe-area-inset-bottom)); /* 适配 iPhone 底部横条 */
+            display: flex;
             justify-content: center;
             align-items: center;
-            z-index: 100;
-            color: #00ffff;
-            transition: opacity 0.5s;
+            gap: 15px;
+            pointer-events: auto;
+            background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
         }
-        .spinner {
-            width: 40px; height: 40px;
-            border: 3px solid rgba(0,255,255,0.3);
-            border-top: 3px solid #00ffff;
+
+        /* 按钮与控件 */
+        .control-group {
+            background: rgba(30, 30, 30, 0.6);
+            backdrop-filter: blur(8px);
+            padding: 8px 15px;
+            border-radius: 50px;
+            border: 1px solid rgba(255,255,255,0.15);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn {
+            background: none; border: none; color: white;
+            font-size: 14px; cursor: pointer; padding: 5px 10px;
+            border-radius: 20px; border: 1px solid rgba(255,255,255,0.2);
+            white-space: nowrap;
+        }
+        .btn:active { background: rgba(255,255,255,0.2); transform: scale(0.95); }
+
+        /* 颜色选择器 */
+        #color-input {
+            width: 28px; height: 28px;
+            border: 2px solid white;
             border-radius: 50%;
-            animation: spin 1s linear infinite;
+            overflow: hidden;
+            padding: 0;
+            background: none;
+            cursor: pointer;
         }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        #color-input::-webkit-color-swatch-wrapper { padding: 0; }
+        #color-input::-webkit-color-swatch { border: none; }
+
+        /* --- 加载层 --- */
+        #loader {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 100;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            color: #00ffff; transition: opacity 0.5s;
+        }
+        .loading-text { margin-top: 15px; font-size: 14px; letter-spacing: 1px; }
+
     </style>
 </head>
 <body>
 
-    <!-- 加载页 -->
+    <!-- 加载动画 -->
     <div id="loader">
-        <div class="spinner"></div>
-        <p style="margin-top:15px; font-size:12px;">正在初始化视觉探针...</p>
-        <p style="font-size:10px; color:#666;">请允许摄像头权限</p>
+        <svg width="50" height="50" viewBox="0 0 50 50">
+            <circle cx="25" cy="25" r="20" fill="none" stroke="#00ffff" stroke-width="4" stroke-dasharray="31.4 31.4">
+                <animateTransform attributeName="transform" type="rotate" from="0 25 25" to="360 25 25" dur="1s" repeatCount="indefinite"/>
+            </circle>
+        </svg>
+        <div class="loading-text">初始化 AI 引擎...</div>
     </div>
 
     <!-- UI 层 -->
-    <div id="ui-container">
-        <!-- 摄像头预览 -->
-        <div id="cam-preview">
-            <video id="input_video" playsinline muted autoplay></video>
-        </div>
-
-        <!-- 右上角状态 -->
-        <div id="status-text">
-            <span id="gesture-icon">Waiting...</span>
-            <div id="mode-name">系统待机中</div>
-        </div>
-
-        <!-- 底部控制条 -->
-        <div id="controls">
-            <div id="color-picker-wrapper">
-                <span>探针颜色</span>
-                <input type="color" id="color-picker" value="#00ffff">
+    <div id="ui-layer">
+        <div class="top-bar">
+            <!-- 摄像头 (点击可折叠) -->
+            <div id="cam-box" onclick="this.classList.toggle('hidden')">
+                <video id="input_video" playsinline muted autoplay></video>
             </div>
-            <div style="width:1px; height:20px; background:rgba(255,255,255,0.2);"></div>
-            <button class="btn" id="fullscreen-btn">⛶ 全屏</button>
+            
+            <!-- 状态信息 -->
+            <div class="status-box">
+                <span id="gesture-icon">👋</span>
+                <div id="mode-text">请在摄像头前展示手势</div>
+            </div>
+        </div>
+
+        <div class="bottom-bar">
+            <div class="control-group">
+                <input type="color" id="color-input" value="#00ffff" title="调整粒子颜色">
+                <span style="font-size:12px; color:#aaa;">颜色</span>
+            </div>
+            <div class="control-group">
+                <button class="btn" id="fullscreen-btn">⛶ 全屏显示</button>
+            </div>
         </div>
     </div>
 
-    <!-- 隐藏的 Canvas 用于文字生成 -->
-    <canvas id="text-canvas" style="display:none;"></canvas>
+    <!-- 隐藏画布用于生成文字 -->
+    <canvas id="text-helper" style="display:none;"></canvas>
 
-    <!-- 脚本资源 -->
+    <!-- 核心库 -->
     <script type="importmap">
         {
             "imports": {
@@ -168,10 +178,10 @@
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-        // --- 核心配置 ---
+        // --- 配置参数 ---
         const CONFIG = {
-            particleCount: 18000, // 粒子总数 (手机端建议不要超过20000)
-            baseSize: 0.6,        // 粒子基础大小
+            particleCount: 16000, // 移动端优化：减少粒子数以防卡顿
+            baseSize: 0.6,
             color: new THREE.Color('#00ffff'),
             names: {
                 1: "方楚元",
@@ -181,40 +191,41 @@
             }
         };
 
-        // --- 全局变量 ---
+        // --- 变量 ---
         let scene, camera, renderer, particles, geometry, material;
         let targetPositions, currentPositions;
-        let lastFingerCount = -1; // 记录上一帧的手势，防止重复计算
+        let lastFingerCount = -1;
 
-        // --- 1. 初始化 Three.js ---
-        function initScene() {
+        // --- 1. 初始化场景 ---
+        function init() {
             scene = new THREE.Scene();
-            scene.fog = new THREE.FogExp2(0x000000, 0.02); // 黑色雾气，增加深邃感
+            scene.fog = new THREE.FogExp2(0x000000, 0.02);
 
+            // 摄像机视场角
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.z = 50;
+            updateCameraPosition(); // 根据屏幕比例调整相机远近
 
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // 限制像素比以优化性能
+            // 限制像素比，省电且防卡顿
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             document.body.appendChild(renderer.domElement);
 
             const controls = new OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
             controls.autoRotate = true;
-            controls.autoRotateSpeed = 0.5;
+            controls.autoRotateSpeed = 0.6;
+            controls.enablePan = false; // 手机上禁止平移，防止误触
 
-            // 创建粒子系统
             initParticles();
             
-            // 默认状态：满屏扩散
+            // 默认满屏状态
             calculateChaosTargets();
 
+            // 事件监听
             window.addEventListener('resize', onWindowResize);
-            
-            // UI 事件绑定
             document.getElementById('fullscreen-btn').addEventListener('click', toggleFullScreen);
-            document.getElementById('color-picker').addEventListener('input', (e) => {
+            document.getElementById('color-input').addEventListener('input', (e) => {
                 CONFIG.color.set(e.target.value);
                 material.color.set(CONFIG.color);
             });
@@ -222,7 +233,18 @@
             animate();
         }
 
-        // --- 2. 粒子系统构建 ---
+        // --- 适配：根据屏幕调整相机位置 ---
+        function updateCameraPosition() {
+            if (window.innerWidth < window.innerHeight) {
+                // 竖屏手机：相机拉远一点，保证内容不被切断
+                camera.position.z = 70; 
+            } else {
+                // 电脑或横屏
+                camera.position.z = 50;
+            }
+        }
+
+        // --- 2. 粒子系统 ---
         function initParticles() {
             geometry = new THREE.BufferGeometry();
             const count = CONFIG.particleCount;
@@ -231,30 +253,29 @@
             targetPositions = new Float32Array(count * 3);
 
             for (let i = 0; i < count * 3; i++) {
-                currentPositions[i] = (Math.random() - 0.5) * 100; // 初始随机
+                currentPositions[i] = (Math.random() - 0.5) * 100;
                 targetPositions[i] = currentPositions[i];
             }
 
             geometry.setAttribute('position', new THREE.BufferAttribute(currentPositions, 3));
 
-            // 创建圆形发光纹理
+            // 程序生成圆形纹理
             const canvas = document.createElement('canvas');
             canvas.width = 32; canvas.height = 32;
             const ctx = canvas.getContext('2d');
             const grad = ctx.createRadialGradient(16,16,0, 16,16,16);
             grad.addColorStop(0, 'rgba(255,255,255,1)');
-            grad.addColorStop(0.4, 'rgba(255,255,255,0.4)');
+            grad.addColorStop(0.5, 'rgba(255,255,255,0.3)');
             grad.addColorStop(1, 'rgba(0,0,0,0)');
             ctx.fillStyle = grad;
             ctx.fillRect(0,0,32,32);
-            const texture = new THREE.CanvasTexture(canvas);
 
             material = new THREE.PointsMaterial({
                 size: CONFIG.baseSize,
                 color: CONFIG.color,
-                map: texture,
+                map: new THREE.CanvasTexture(canvas),
                 transparent: true,
-                opacity: 0.8,
+                opacity: 0.9,
                 blending: THREE.AdditiveBlending,
                 depthWrite: false
             });
@@ -263,80 +284,74 @@
             scene.add(particles);
         }
 
-        // --- 3. 形状计算逻辑 ---
+        // --- 3. 形状算法 ---
 
-        // 3.1 满屏扩散 (Chaos) - 对应 "张开手"
+        // 3.1 满屏扩散 (恢复)
         function calculateChaosTargets() {
             const count = CONFIG.particleCount;
             for (let i = 0; i < count; i++) {
                 const i3 = i * 3;
-                // 宽范围随机分布
-                targetPositions[i3] = (Math.random() - 0.5) * 200;
-                targetPositions[i3+1] = (Math.random() - 0.5) * 120;
+                targetPositions[i3] = (Math.random() - 0.5) * 250;
+                targetPositions[i3+1] = (Math.random() - 0.5) * 150;
                 targetPositions[i3+2] = (Math.random() - 0.5) * 100;
             }
-            material.size = CONFIG.baseSize; // 恢复正常大小
+            material.size = CONFIG.baseSize;
         }
 
-        // 3.2 爱心形状 (Heart) - 对应 "握拳"
+        // 3.2 爱心 (握拳)
         function calculateHeartTargets() {
             const count = CONFIG.particleCount;
             for (let i = 0; i < count; i++) {
                 const i3 = i * 3;
                 let t = Math.random() * Math.PI * 2;
-                // 3D 心形公式
                 let x = 16 * Math.pow(Math.sin(t), 3);
                 let y = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t);
-                let z = (Math.random() - 0.5) * 4;
+                let z = (Math.random() - 0.5) * 5;
 
-                // 只有前 60% 的粒子组成爱心，剩下的做背景氛围
-                if (i < count * 0.6) {
-                    targetPositions[i3] = x * 1.2;
-                    targetPositions[i3+1] = y * 1.2;
-                    targetPositions[i3+2] = z * 1.2;
+                // 竖屏时爱心稍微小一点
+                const scale = window.innerWidth < window.innerHeight ? 1.0 : 1.3;
+
+                if (i < count * 0.7) {
+                    targetPositions[i3] = x * scale;
+                    targetPositions[i3+1] = y * scale;
+                    targetPositions[i3+2] = z * scale;
                 } else {
-                    // 背景漂浮粒子
-                    targetPositions[i3] = (Math.random() - 0.5) * 150;
-                    targetPositions[i3+1] = (Math.random() - 0.5) * 150;
+                    targetPositions[i3] = (Math.random() - 0.5) * 200;
+                    targetPositions[i3+1] = (Math.random() - 0.5) * 200;
                     targetPositions[i3+2] = (Math.random() - 0.5) * 100;
                 }
             }
-            material.size = CONFIG.baseSize * 1.5; // 爱心模式下粒子稍微变大
+            material.size = CONFIG.baseSize * 1.5;
         }
 
-        // 3.3 文字生成 (Text) - 对应 "数字手势"
+        // 3.3 文字 (1-4指)
         function calculateTextTargets(text) {
-            const canvas = document.getElementById('text-canvas');
+            const canvas = document.getElementById('text-helper');
             const ctx = canvas.getContext('2d');
+            canvas.width = 1024; canvas.height = 512;
             
-            // 动态设置画布大小以保证清晰度
-            canvas.width = 1024;
-            canvas.height = 512;
-            
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            // 使用系统粗体字体，确保多平台兼容
-            ctx.font = "bold 180px -apple-system, BlinkMacSystemFont, 'Microsoft YaHei', sans-serif";
+            ctx.clearRect(0,0, canvas.width, canvas.height);
+            ctx.font = "bold 180px 'Microsoft YaHei', sans-serif";
             ctx.fillStyle = "white";
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
-            ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+            ctx.fillText(text, canvas.width/2, canvas.height/2);
 
-            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+            const imgData = ctx.getImageData(0,0,canvas.width,canvas.height).data;
             const validPoints = [];
-            
-            // 像素采样，step 越小越精细，但需要的粒子越多
-            const step = 4; 
-            for (let y = 0; y < canvas.height; y += step) {
-                for (let x = 0; x < canvas.width; x += step) {
-                    const alpha = imgData[(y * canvas.width + x) * 4 + 3];
-                    if (alpha > 128) {
-                        // 坐标映射：将 Canvas 2D 坐标映射到 3D 空间
-                        // 根据屏幕宽度调整缩放，手机上缩小一点
-                        const scale = window.innerWidth < 600 ? 0.12 : 0.18;
+            const step = 4;
+
+            // --- 核心适配：动态计算文字缩放 ---
+            // 如果是手机竖屏，缩小比例 (0.11)，如果是电脑，正常比例 (0.18)
+            const isPortrait = window.innerWidth < window.innerHeight;
+            const scale = isPortrait ? 0.11 : 0.18;
+
+            for (let y=0; y<canvas.height; y+=step) {
+                for (let x=0; x<canvas.width; x+=step) {
+                    if (imgData[(y*canvas.width+x)*4+3] > 128) {
                         validPoints.push({
-                            x: (x - canvas.width / 2) * scale,
-                            y: -(y - canvas.height / 2) * scale,
-                            z: 0
+                            x: (x - canvas.width/2) * scale,
+                            y: -(y - canvas.height/2) * scale
                         });
                     }
                 }
@@ -346,26 +361,23 @@
             for (let i = 0; i < count; i++) {
                 const i3 = i * 3;
                 if (i < validPoints.length) {
-                    // 组成文字
                     targetPositions[i3] = validPoints[i].x;
                     targetPositions[i3+1] = validPoints[i].y;
-                    targetPositions[i3+2] = validPoints[i].z;
+                    targetPositions[i3+2] = 0;
                 } else {
-                    // 多余粒子做背景星空
                     targetPositions[i3] = (Math.random() - 0.5) * 200;
-                    targetPositions[i3+1] = (Math.random() - 0.5) * 150;
+                    targetPositions[i3+1] = (Math.random() - 0.5) * 200;
                     targetPositions[i3+2] = (Math.random() - 0.5) * 100;
                 }
             }
-            material.size = CONFIG.baseSize * 1.2;
+            material.size = CONFIG.baseSize * 1.3;
         }
 
-        // --- 4. 动画与渲染 ---
+        // --- 4. 循环动画 ---
         function animate() {
             requestAnimationFrame(animate);
-
+            
             const positions = geometry.attributes.position.array;
-            // 缓动系数，0.08 比较平滑
             const lerpSpeed = 0.08;
 
             for (let i = 0; i < CONFIG.particleCount; i++) {
@@ -374,11 +386,11 @@
                 positions[i3+1] += (targetPositions[i3+1] - positions[i3+1]) * lerpSpeed;
                 positions[i3+2] += (targetPositions[i3+2] - positions[i3+2]) * lerpSpeed;
                 
-                // 增加一点呼吸动态效果
-                if (lastFingerCount === 0) { // 爱心模式下微弱跳动
-                    const pulse = Math.sin(Date.now() * 0.003) * 0.02;
-                    positions[i3] += positions[i3] * pulse;
-                    positions[i3+1] += positions[i3+1] * pulse;
+                // 爱心跳动
+                if (lastFingerCount === 0) {
+                    const beat = Math.sin(Date.now() * 0.005) * 0.03;
+                    positions[i3] += positions[i3] * beat;
+                    positions[i3+1] += positions[i3+1] * beat;
                 }
             }
 
@@ -386,118 +398,97 @@
             renderer.render(scene, camera);
         }
 
-        // --- 5. MediaPipe 手势识别 ---
+        // --- 5. MediaPipe 手势 ---
         function initHandTracking() {
-            const videoElement = document.getElementById('input_video');
+            const video = document.getElementById('input_video');
             const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
-
+            
             hands.setOptions({
                 maxNumHands: 1,
-                modelComplexity: 1, // 1为平衡模式，手机端跑得动
+                modelComplexity: 1,
                 minDetectionConfidence: 0.5,
                 minTrackingConfidence: 0.5
             });
 
-            hands.onResults(onHandResults);
+            hands.onResults(results => {
+                const icon = document.getElementById('gesture-icon');
+                const text = document.getElementById('mode-text');
 
-            const cameraUtils = new Camera(videoElement, {
-                onFrame: async () => { await hands.send({image: videoElement}); },
-                width: 320, height: 240
-            });
+                if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                    const lm = results.multiHandLandmarks[0];
+                    const fingers = countFingers(lm);
 
-            cameraUtils.start()
-                .then(() => document.getElementById('loader').style.opacity = 0)
-                .catch(err => {
-                    console.error(err);
-                    alert("无法启动摄像头，请检查权限或换个浏览器。");
-                });
-        }
-
-        function onHandResults(results) {
-            const statusIcon = document.getElementById('gesture-icon');
-            const statusText = document.getElementById('mode-name');
-
-            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                const landmarks = results.multiHandLandmarks[0];
-                const fingers = countFingers(landmarks);
-
-                // 只有当手势改变时才重新计算位置，节省性能
-                if (fingers !== lastFingerCount) {
-                    lastFingerCount = fingers;
-
-                    if (fingers === 0) {
-                        calculateHeartTargets();
-                        statusIcon.innerText = "❤️"; statusText.innerText = "爱心模式 (聚拢)";
-                    } else if (fingers === 5) {
-                        calculateChaosTargets();
-                        statusIcon.innerText = "✨"; statusText.innerText = "满屏扩散 (恢复)";
-                    } else if (CONFIG.names[fingers]) {
-                        calculateTextTargets(CONFIG.names[fingers]);
-                        statusIcon.innerText = ["☝️", "✌️", "👌", "🖖"][fingers-1];
-                        statusText.innerText = `检测到: ${CONFIG.names[fingers]}`;
-                    } else {
-                        // 其他情况 (如6指错误识别等) 保持不变或设为扩散
-                        // statusText.innerText = "未知手势";
+                    if (fingers !== lastFingerCount) {
+                        lastFingerCount = fingers;
+                        
+                        if (fingers === 0) {
+                            calculateHeartTargets();
+                            icon.innerText = "❤️"; text.innerText = "爱心 (聚拢)";
+                        } else if (fingers === 5) {
+                            calculateChaosTargets();
+                            icon.innerText = "✨"; text.innerText = "满屏扩散";
+                        } else if (CONFIG.names[fingers]) {
+                            calculateTextTargets(CONFIG.names[fingers]);
+                            icon.innerText = ["☝️", "✌️", "👌", "🖖"][fingers-1];
+                            text.innerText = CONFIG.names[fingers];
+                        }
                     }
                 }
-            } else {
-                // 没有检测到手，不做处理，保持上一个状态
-                statusIcon.innerText = "✋"; statusText.innerText = "寻找手势中...";
-            }
+            });
+
+            const camera = new Camera(video, {
+                onFrame: async () => { await hands.send({image: video}); },
+                width: 320, height: 240
+            });
+            camera.start().then(() => {
+                document.getElementById('loader').style.opacity = 0;
+                setTimeout(() => document.getElementById('loader').style.display='none', 500);
+            });
         }
 
-        // 简单的手指计数算法
         function countFingers(lm) {
-            const tips = [8, 12, 16, 20]; // 食指到小指尖
-            const pips = [6, 10, 14, 18]; // 食指到小指关节
-            let count = 0;
-            
-            // 1. 判断食指、中指、无名指、小指是否伸直 (指尖高于关节)
-            // 注意：MediaPipe Y轴向下为正，所以伸直是指尖Y < 关节Y
-            for (let i=0; i<4; i++) {
-                if (lm[tips[i]].y < lm[pips[i]].y) count++;
-            }
-
-            // 2. 判断拇指 (根据X轴距离判断)
-            // 右手：拇指尖在指根左侧；左手：拇指尖在指根右侧。
-            // 这里简化逻辑：判断拇指尖到小指根部的距离 是否 大于 食指根部到小指根部的距离
-            const thumbTip = lm[4];
-            const pinkyBase = lm[17];
-            const indexBase = lm[5];
-            
-            const thumbDist = Math.hypot(thumbTip.x - pinkyBase.x, thumbTip.y - pinkyBase.y);
-            const indexDist = Math.hypot(indexBase.x - pinkyBase.x, indexBase.y - pinkyBase.y);
-            
-            if (thumbDist > indexDist * 1.3) count++;
-
-            return count;
+            const tips = [8, 12, 16, 20];
+            const pips = [6, 10, 14, 18];
+            let c = 0;
+            // 四指
+            for(let i=0; i<4; i++) if(lm[tips[i]].y < lm[pips[i]].y) c++;
+            // 拇指
+            const thumbDist = Math.hypot(lm[4].x - lm[17].x, lm[4].y - lm[17].y);
+            const indexDist = Math.hypot(lm[5].x - lm[17].x, lm[5].y - lm[17].y);
+            if(thumbDist > indexDist * 1.3) c++;
+            return c;
         }
 
-        // --- 辅助功能 ---
+        // --- 窗口适配 ---
         function onWindowResize() {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
-            // 重新计算一次当前文字（如果正在显示文字），以适配新尺寸
+            updateCameraPosition();
+            
+            // 重新计算文字大小适配新屏幕
             if (lastFingerCount >= 1 && lastFingerCount <= 4) {
-                 calculateTextTargets(CONFIG.names[lastFingerCount]);
+                calculateTextTargets(CONFIG.names[lastFingerCount]);
             }
         }
 
+        // --- 真·全屏逻辑 ---
         function toggleFullScreen() {
+            const elem = document.documentElement;
             if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen().catch(err => {
-                    console.log(`全屏失败: ${err.message}`);
-                });
+                // 尝试标准全屏
+                if (elem.requestFullscreen) {
+                    elem.requestFullscreen().catch(err => console.log(err));
+                } else if (elem.webkitRequestFullscreen) { /* Safari */
+                    elem.webkitRequestFullscreen();
+                }
             } else {
-                document.exitFullscreen();
+                if (document.exitFullscreen) document.exitFullscreen();
             }
         }
 
-        // --- 启动程序 ---
-        initScene();
+        init();
         initHandTracking();
-
     </script>
 </body>
 </html>
