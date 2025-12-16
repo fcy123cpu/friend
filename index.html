@@ -2,9 +2,9 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <!-- 核心适配：禁止缩放，适配刘海屏，锁定视口 -->
+    <!-- 禁止缩放，适配刘海屏，锁定视口 -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>3D 粒子汇聚大爱心</title>
+    <title>3D 粒子汇聚大爱心 (极速版)</title>
     <style>
         /* --- 沉浸式基础样式 --- */
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
@@ -12,7 +12,7 @@
             margin: 0; padding: 0; overflow: hidden; 
             background-color: #000; 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            width: 100vw; height: 100dvh; /* 使用dvh适配移动端动态高度 */
+            width: 100vw; height: 100dvh;
         }
         canvas { display: block; width: 100%; height: 100%; }
 
@@ -25,7 +25,7 @@
 
         /* 顶部栏 */
         .top-bar {
-            padding: max(15px, env(safe-area-inset-top)); /* 避开刘海 */
+            padding: max(15px, env(safe-area-inset-top));
             padding-left: 20px; padding-right: 20px;
             display: flex; justify-content: space-between; align-items: flex-start;
         }
@@ -36,7 +36,7 @@
             border-radius: 12px;
             border: 1px solid rgba(255, 255, 255, 0.3);
             background: #000; overflow: hidden;
-            transform: scaleX(-1); /* 镜像翻转 */
+            transform: scaleX(-1);
             pointer-events: auto;
             transition: opacity 0.3s;
             box-shadow: 0 4px 12px rgba(0,0,0,0.6);
@@ -69,7 +69,6 @@
             display: flex; align-items: center; gap: 8px;
         }
         
-        /* 颜色选择器 */
         #color-input { 
             width: 24px; height: 24px; border: 2px solid #fff; 
             border-radius: 50%; padding: 0; background: none; -webkit-appearance: none;
@@ -92,21 +91,16 @@
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .loading-text { margin-top: 15px; color: #ff0055; font-size: 14px; letter-spacing: 1px; }
 
-        /* 横屏微调 */
-        @media (orientation: landscape) {
-            #cam-box { width: 120px; height: 90px; }
-        }
+        @media (orientation: landscape) { #cam-box { width: 120px; height: 90px; } }
     </style>
 </head>
 <body>
 
-    <!-- 加载页 -->
     <div id="loader">
         <div class="loader-spinner"></div>
-        <div class="loading-text">正在生成 3D 引擎...</div>
+        <div class="loading-text">极速引擎加载中...</div>
     </div>
 
-    <!-- UI 交互层 -->
     <div id="ui-layer">
         <div class="top-bar">
             <div id="cam-box" onclick="this.classList.toggle('hidden')">
@@ -117,22 +111,19 @@
                 <div id="mode-text">请握拳召唤爱心</div>
             </div>
         </div>
-
         <div class="bottom-bar">
             <div class="control-item">
                 <input type="color" id="color-input" value="#ff0055">
                 <span>粒子色</span>
             </div>
             <div class="control-item" onclick="toggleFullScreen()" style="cursor: pointer;">
-                <span>⛶ 全屏显示</span>
+                <span>⛶ 全屏</span>
             </div>
         </div>
     </div>
 
-    <!-- 隐藏画布用于生成文字 -->
     <canvas id="text-helper" style="display:none;"></canvas>
 
-    <!-- 脚本依赖 -->
     <script type="importmap">
         {
             "imports": {
@@ -149,64 +140,73 @@
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-        // --- 配置中心 ---
         const CONFIG = {
-            particleCount: 13000, // 粒子总数，适配手机性能
-            baseSize: 1.0,        // 粒子大小
-            defaultColor: new THREE.Color('#00ffff'), // 平时是青色
-            heartColor: new THREE.Color('#ff0055'),   // 爱心是热烈的红
-            textColor: new THREE.Color('#ffffff'),    // 文字是白色
+            particleCount: 12000, // 优化：减少到12000，平衡性能与视觉
+            baseSize: 1.0,
+            defaultColor: new THREE.Color('#00ffff'),
+            heartColor: new THREE.Color('#ff0055'),
+            textColor: new THREE.Color('#ffffff'),
             names: { 1: "方楚元", 2: "郑田田", 3: "潘铭敏", 4: "邵安妮" }
         };
 
-        // --- 全局变量 ---
         let scene, camera, renderer, particles, geometry, material;
         let targetPositions, currentPositions, colors; 
-        let heartLocalPositions = []; // 存储爱心原始形状用于旋转
+        let heartLocalPositions = []; 
         let lastFingerCount = -1;
         let isHeartMode = false;
-        let heartSplitIndex = 0; // 分割爱心和文字粒子的索引
+        let heartSplitIndex = 0; 
         let time = 0;
 
-        // --- 1. 初始化 3D 场景 ---
         function init() {
             scene = new THREE.Scene();
-            // 深邃的黑色雾气，增加空间感
             scene.fog = new THREE.FogExp2(0x000000, 0.002);
 
             camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
-            updateCameraPosition(); // 初始适配
+            updateCameraPosition();
 
-            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+            // 优化：使用 mediump 精度，大幅降低老旧手机GPU压力
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, precision: 'mediump' });
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // 限制DPI以省电
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); 
             document.body.appendChild(renderer.domElement);
 
             const controls = new OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
-            controls.enablePan = false; // 手机禁止平移
-            controls.autoRotate = false; // 手动控制爱心旋转，不旋转整个场景
+            controls.enablePan = false; 
+            controls.autoRotate = false; 
 
             initParticles();
-            // 默认启动状态：满屏散落
             calculateChaosTargets(); 
 
-            // 监听屏幕旋转/缩放
             window.addEventListener('resize', onWindowResize);
             
-            // 颜色选择器
             document.getElementById('color-input').addEventListener('input', (e) => {
                 CONFIG.heartColor.set(e.target.value);
-                // 如果当前是爱心模式，立即刷新颜色
-                if(isHeartMode) {
-                   // 颜色在动画循环中会自动更新
-                }
             });
 
             animate();
         }
 
-        // --- 2. 粒子系统构建 ---
+        // 优化：本地生成纹理，无需网络请求
+        function createParticleTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 32; canvas.height = 32;
+            const ctx = canvas.getContext('2d');
+            
+            // 绘制径向渐变，模拟光点
+            const grad = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+            grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
+            grad.addColorStop(0.2, 'rgba(255, 255, 255, 0.8)');
+            grad.addColorStop(0.5, 'rgba(255, 255, 255, 0.2)');
+            grad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+            
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, 32, 32);
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            return texture;
+        }
+
         function initParticles() {
             geometry = new THREE.BufferGeometry();
             const count = CONFIG.particleCount;
@@ -215,32 +215,29 @@
             targetPositions = new Float32Array(count * 3);
             colors = new Float32Array(count * 3);
             
-            // 预分配爱心本地坐标数组
             for(let i=0; i<count; i++) heartLocalPositions.push({x:0, y:0, z:0});
 
             const c = CONFIG.defaultColor;
             for (let i = 0; i < count; i++) {
-                // 初始位置：随机分布
                 currentPositions[i*3] = (Math.random() - 0.5) * 500;
                 currentPositions[i*3+1] = (Math.random() - 0.5) * 500;
                 currentPositions[i*3+2] = (Math.random() - 0.5) * 500;
                 targetPositions[i*3] = currentPositions[i*3];
                 
-                // 初始颜色
                 colors[i*3] = c.r; colors[i*3+1] = c.g; colors[i*3+2] = c.b;
             }
 
             geometry.setAttribute('position', new THREE.BufferAttribute(currentPositions, 3));
             geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
-            // 关键：使用发光贴图，让粒子看起来像星星
-            const sprite = new THREE.TextureLoader().load('https://threejs.org/examples/textures/sprites/spark1.png');
+            // 优化：使用本地生成的贴图
+            const sprite = createParticleTexture();
 
             material = new THREE.PointsMaterial({
                 size: CONFIG.baseSize,
                 vertexColors: true,
                 map: sprite,
-                blending: THREE.AdditiveBlending, // 叠加混合模式，重叠处更亮
+                blending: THREE.AdditiveBlending,
                 depthWrite: false,
                 transparent: true,
                 opacity: 0.9
@@ -250,63 +247,45 @@
             scene.add(particles);
         }
 
-        // --- 3. 核心：大爱心汇聚算法 ---
+        // --- 核心：大爱心逻辑 (保持不变) ---
         function calculateBigHeartTargets() {
             isHeartMode = true;
             const count = CONFIG.particleCount;
-            
-            // 75% 粒子构成爱心，25% 粒子构成下方的 FRIEND 文字
             heartSplitIndex = Math.floor(count * 0.75);
             
-            // 手机端适配参数
             const isPortrait = window.innerWidth < window.innerHeight;
-            // 竖屏时 scale 小一点以免撑破屏幕
             const heartScale = isPortrait ? 2.8 : 3.5; 
-            const heartOffsetY = 25; // 稍微上移
+            const heartOffsetY = 25; 
             const textOffsetY = -70;
 
-            // --- A. 生成立体爱心 (Rejection Sampling) ---
             let i = 0;
             while (i < heartSplitIndex) {
-                // 在 4x4x4 的空间内随机取点
                 const x = (Math.random() - 0.5) * 4;
                 const y = (Math.random() - 0.5) * 4;
                 const z = (Math.random() - 0.5) * 4;
-                
-                // 为了让爱心看起来更厚实，稍微压缩 Z 轴输入
                 const zMod = z * 0.8; 
-
-                // 3D爱心方程
                 const a = x*x + 2.25*y*y + zMod*zMod - 1;
-                // 判断点是否在爱心内部
+                
                 if (a*a*a - x*x*zMod*zMod*zMod - 0.1125*y*y*zMod*zMod*zMod <= 0) {
-                    // 保存这个点
-                    // 1. 存入本地坐标 (用于旋转)
                     heartLocalPositions[i] = {
                         x: x * 30 * heartScale,
                         y: y * 30 * heartScale,
                         z: z * 30 * heartScale
                     };
-
-                    // 2. targetPositions 暂时不需要设置准确值，因为在 animate 里会由旋转逻辑接管
-                    // 但为了逻辑统一，先设一个初始值
                     const i3 = i * 3;
                     targetPositions[i3] = heartLocalPositions[i].x;
                     targetPositions[i3+1] = heartLocalPositions[i].y + heartOffsetY;
                     targetPositions[i3+2] = heartLocalPositions[i].z;
-                    
                     i++;
                 }
             }
 
-            // --- B. 生成 FRIEND 文字 ---
             const canvas = document.getElementById('text-helper');
             const ctx = canvas.getContext('2d');
-            canvas.width = 1024; canvas.height = 256;
+            canvas.width = 512; canvas.height = 128; // 优化：减小Canvas尺寸，提高生成速度
             ctx.clearRect(0,0, canvas.width, canvas.height);
             
-            // 超粗字体
-            ctx.font = "900 160px 'Arial Black', sans-serif";
+            ctx.font = "900 80px 'Arial Black', sans-serif";
             ctx.fillStyle = "white";
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
@@ -314,8 +293,8 @@
 
             const imgData = ctx.getImageData(0,0,canvas.width,canvas.height).data;
             const validPoints = [];
-            const step = 4; // 采样步长
-            const textScale = isPortrait ? 0.13 : 0.16;
+            const step = 2; // 优化：因为Canvas变小了，步长也要变小以保证密度
+            const textScale = isPortrait ? 0.26 : 0.32; // 调整缩放比例适配新Canvas
 
             for (let y=0; y<canvas.height; y+=step) {
                 for (let x=0; x<canvas.width; x+=step) {
@@ -328,24 +307,19 @@
                 }
             }
 
-            // 分配文字粒子
             for (let j = heartSplitIndex; j < count; j++) {
                 const i3 = j * 3;
                 if (validPoints.length > 0) {
-                    // 循环取点
                     const p = validPoints[(j - heartSplitIndex) % validPoints.length];
                     targetPositions[i3] = p.x;
                     targetPositions[i3+1] = p.y + textOffsetY;
-                    // 文字稍微有一点厚度
                     targetPositions[i3+2] = (Math.random() - 0.5) * 8; 
                 } else {
-                    // 万一没有文字点，隐藏
                     targetPositions[i3] = 0; targetPositions[i3+1] = -5000;
                 }
             }
         }
 
-        // --- 4. 散乱模式 ---
         function calculateChaosTargets() {
             isHeartMode = false;
             for (let i = 0; i < CONFIG.particleCount; i++) {
@@ -356,14 +330,13 @@
             }
         }
 
-        // --- 5. 名字模式 ---
         function calculateTextTargets(text) {
             isHeartMode = false;
             const canvas = document.getElementById('text-helper');
             const ctx = canvas.getContext('2d');
-            canvas.width = 1024; canvas.height = 512;
+            canvas.width = 512; canvas.height = 256; // 优化：减小Canvas尺寸
             ctx.clearRect(0,0, canvas.width, canvas.height);
-            ctx.font = "900 200px 'Microsoft YaHei', sans-serif";
+            ctx.font = "900 100px 'Microsoft YaHei', sans-serif";
             ctx.fillStyle = "white";
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
@@ -371,8 +344,8 @@
 
             const imgData = ctx.getImageData(0,0,canvas.width,canvas.height).data;
             const validPoints = [];
-            const step = 3;
-            const scale = (window.innerWidth < window.innerHeight) ? 0.12 : 0.18;
+            const step = 2;
+            const scale = (window.innerWidth < window.innerHeight) ? 0.24 : 0.36;
 
             for (let y=0; y<canvas.height; y+=step) {
                 for (let x=0; x<canvas.width; x+=step) {
@@ -396,7 +369,6 @@
             }
         }
 
-        // --- 6. 动画循环 & 旋转逻辑 ---
         function animate() {
             requestAnimationFrame(animate);
             time += 0.02;
@@ -405,63 +377,55 @@
             const cols = geometry.attributes.color.array;
             const heartOffsetY = 25;
 
-            // 心跳参数
             let heartbeat = 1;
             if (isHeartMode) {
-                // 模拟扑通扑通：快起慢落
                 const beat = Math.pow(Math.sin(time * 3.5), 63) * 0.15 + Math.sin(time * 3.5 + 0.5) * 0.05;
                 heartbeat = 1 + beat;
             }
 
-            // 旋转矩阵计算 (Y轴旋转)
-            const angle = time * 0.6; // 旋转速度
+            const angle = time * 0.6;
             const cos = Math.cos(angle);
             const sin = Math.sin(angle);
+
+            // 优化：使用临时变量减少属性访问
+            const lerpSpeed = 0.08;
+            const colorSpeed = 0.05;
 
             for (let i = 0; i < CONFIG.particleCount; i++) {
                 const i3 = i * 3;
                 let tx, ty, tz;
 
-                // 如果是爱心模式 且 粒子属于爱心部分
                 if (isHeartMode && i < heartSplitIndex) {
                     const local = heartLocalPositions[i];
                     
-                    // 1. 应用心跳缩放
                     const lx = local.x * heartbeat;
                     const ly = local.y * heartbeat;
                     const lz = local.z * heartbeat;
 
-                    // 2. 应用 Y 轴旋转 (x' = x*cos - z*sin, z' = x*sin + z*cos)
-                    const rx = lx * cos - lz * sin;
-                    const rz = lx * sin + lz * cos;
-                    const ry = ly;
-
-                    // 3. 设置目标位置
-                    tx = rx;
-                    ty = ry + heartOffsetY;
-                    tz = rz;
+                    tx = lx * cos - lz * sin;
+                    tz = lx * sin + lz * cos;
+                    ty = ly + heartOffsetY;
                 } else {
-                    // 文字或散点不旋转，直接取 targetPositions
                     tx = targetPositions[i3];
                     ty = targetPositions[i3+1];
                     tz = targetPositions[i3+2];
                 }
 
-                // 统一的平滑移动 (Lerp)
-                positions[i3]   += (tx - positions[i3])   * 0.08;
-                positions[i3+1] += (ty - positions[i3+1]) * 0.08;
-                positions[i3+2] += (tz - positions[i3+2]) * 0.08;
+                positions[i3]   += (tx - positions[i3])   * lerpSpeed;
+                positions[i3+1] += (ty - positions[i3+1]) * lerpSpeed;
+                positions[i3+2] += (tz - positions[i3+2]) * lerpSpeed;
 
-                // 颜色变化
-                let targetC;
+                let tr, tg, tb;
                 if (isHeartMode) {
-                    targetC = (i < heartSplitIndex) ? CONFIG.heartColor : CONFIG.textColor;
+                    const c = (i < heartSplitIndex) ? CONFIG.heartColor : CONFIG.textColor;
+                    tr = c.r; tg = c.g; tb = c.b;
                 } else {
-                    targetC = CONFIG.defaultColor;
+                    const c = CONFIG.defaultColor;
+                    tr = c.r; tg = c.g; tb = c.b;
                 }
-                cols[i3]   += (targetC.r - cols[i3])   * 0.05;
-                cols[i3+1] += (targetC.g - cols[i3+1]) * 0.05;
-                cols[i3+2] += (targetC.b - cols[i3+2]) * 0.05;
+                cols[i3]   += (tr - cols[i3])   * colorSpeed;
+                cols[i3+1] += (tg - cols[i3+1]) * colorSpeed;
+                cols[i3+2] += (tb - cols[i3+2]) * colorSpeed;
             }
 
             geometry.attributes.position.needsUpdate = true;
@@ -469,16 +433,10 @@
             renderer.render(scene, camera);
         }
 
-        // --- 7. 适配逻辑 ---
         function updateCameraPosition() {
             const aspect = window.innerWidth / window.innerHeight;
-            if (aspect < 1) {
-                // 竖屏：相机拉远，因为爱心较宽
-                camera.position.z = 150; 
-            } else {
-                // 横屏：相机拉近
-                camera.position.z = 90;
-            }
+            if (aspect < 1) camera.position.z = 150; 
+            else camera.position.z = 90;
         }
 
         function onWindowResize() {
@@ -487,20 +445,19 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             updateCameraPosition();
             
-            // 重新计算形状大小
             if(isHeartMode) calculateBigHeartTargets();
             else if(lastFingerCount > 0 && lastFingerCount < 5) calculateTextTargets(CONFIG.names[lastFingerCount]);
             else calculateChaosTargets();
         }
 
-        // --- 8. 手势识别 ---
         function initHandTracking() {
             const video = document.getElementById('input_video');
             const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
             
             hands.setOptions({
                 maxNumHands: 1,
-                modelComplexity: 1, // 0性能最好，1精度适中
+                // 核心优化：使用 Lite 模型 (0)，速度极快
+                modelComplexity: 0, 
                 minDetectionConfidence: 0.5,
                 minTrackingConfidence: 0.5
             });
@@ -517,19 +474,16 @@
                         lastFingerCount = fingers;
                         
                         if (fingers === 0) { 
-                            // 握拳 -> 触发大爱心
                             calculateBigHeartTargets();
                             icon.innerText = "❤️"; 
                             text.innerText = "LOVE YOU";
                             text.style.color = "#ff0055";
                         } else if (fingers === 5) {
-                            // 张开手 -> 散开
                             calculateChaosTargets();
                             icon.innerText = "✨"; 
                             text.innerText = "星尘漫天";
                             text.style.color = "#fff";
                         } else if (CONFIG.names[fingers]) {
-                            // 数字 -> 名字
                             calculateTextTargets(CONFIG.names[fingers]);
                             icon.innerText = ["☝️", "✌️", "👌", "🖖"][fingers-1];
                             text.innerText = CONFIG.names[fingers];
@@ -541,7 +495,8 @@
 
             const cam = new Camera(video, {
                 onFrame: async () => { await hands.send({image: video}); },
-                width: 320, height: 240 // 降低分辨率以提升手机FPS
+                // 优化：降低输入分辨率，大幅减少发热和延迟
+                width: 256, height: 192 
             });
             cam.start().then(() => {
                 const loader = document.getElementById('loader');
@@ -561,7 +516,6 @@
             return c;
         }
 
-        // 全屏工具
         window.toggleFullScreen = function() {
             if (!document.fullscreenElement) {
                 document.documentElement.requestFullscreen().catch(e=>{});
